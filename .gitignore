@@ -1,0 +1,13 @@
+bin/
+config/
+lib/
+temp/
+include/
+*.key
+**/*.log
+**/*.gz
+**/*.parquet
+**/*.json
+.DS_Store
+pyvenv.cfg
+**/__pycache__
