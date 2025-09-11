@@ -1,4 +1,5 @@
-from scr.AWSS3Loader import S3Uploader
+# from scr.AWSS3Loader import S3Uploader
+from scr.AWSS3Loader_fix import S3Uploader
 from scr.BigqueryToJson import BigQueryExporter
 from datetime import datetime, timezone
 
@@ -6,7 +7,7 @@ if __name__ == '__main__':
 
     with BigQueryExporter() as exporter:
         
-        exporter.raw_dt = '20250908'
+        exporter.raw_dt = '20250910'
         exporter.dt = datetime.strptime(str(exporter.raw_dt), '%Y%m%d').strftime('%Y-%m-%d')
         
         # bq_table_addres = 'organic-reef-315010.amplitude_ryadom_user_app.EVENTS_296820'

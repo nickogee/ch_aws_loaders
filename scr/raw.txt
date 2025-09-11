@@ -1,0 +1,47 @@
+adid: double
+amplitude_attribution_ids: list<item: null>
+amplitude_event_type: double
+amplitude_id: int64
+app: int64
+city: string
+client_event_time: timestamp[us, tz=UTC]
+client_upload_time: timestamp[us, tz=UTC]
+country: string
+data: string
+device_brand: double
+device_carrier: double
+device_family: string
+device_id: string
+device_manufacturer: double
+device_model: double
+device_type: string
+event_id: int64
+event_properties: string
+event_time: timestamp[us, tz=UTC]
+event_type: string
+followed_an_identify: double
+group_properties: string
+groups: string
+idfa: double
+ip_address: string
+is_attribution_event: double
+language: string
+library: string
+location_lat: double
+location_lng: double
+os_name: string
+os_version: string
+paying: double
+platform: string
+processed_time: timestamp[us, tz=UTC]
+region: string
+sample_rate: double
+server_received_time: timestamp[us, tz=UTC]
+server_upload_time: timestamp[us, tz=UTC]
+session_id: int64
+start_version: double
+user_creation_time: timestamp[us]
+user_id: double
+user_properties: string
+uuid: string
+version_name: double

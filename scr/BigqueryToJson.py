@@ -33,7 +33,7 @@ class BigQueryExporter():
     def __enter__(self):
         """Create temporary directory when entering context."""
         # self.temp_dir = tempfile.mkdtemp(prefix='bigquery_export_')
-        self.temp_dir = tempfile.mkdtemp(prefix='bigquery_export_', dir='/Users/hachimantaro/Repo/choco_projects/ch_aws_s3_test/temp/')
+        self.temp_dir = tempfile.mkdtemp(prefix='bigquery_export_', dir='/Users/hachimantaro/Repo/choco_projects/ch_indrive_aws_s3/temp/')
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
