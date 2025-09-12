@@ -19,6 +19,8 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pyarrow.json as paj
+from scr.schema import schema as sch
+
 
 @dataclass
 class S3Config:
@@ -47,7 +49,7 @@ class S3UploadError(S3UploaderError):
 class S3Uploader():
     """Handles the process of converting, compressing, and uploading files to S3."""
 
-    def __init__(self, entity_path: str, dt_partition: datetime, dt_now: Optional[datetime] = None):
+    def __init__(self, entity_path: str, dt_partition: datetime, pa_schema: pa.Schema, timestamp_columns: Optional[list], string_like_columns: Optional[list], dt_now: Optional[datetime] = None):
         """
         Initialize the S3Uploader.
 
@@ -62,6 +64,9 @@ class S3Uploader():
         self.dt_now = dt_now or datetime.now(timezone.utc)
         self.dt_partition = dt_partition
         self.hash_string = self._generate_hash(8)
+        self.pa_schema = pa_schema
+        self.timestamp_columns = timestamp_columns
+        self.string_like_columns = string_like_columns
         self._setup_paths()
         self._setup_s3_client()
 
@@ -135,124 +140,26 @@ class S3Uploader():
             data = pd.read_json(self.json_path)
             self.logger.info(f'---- Write to Json - {len(data)} rows')
 
-            # Sanitize all columns to avoid Arrow type inference issues
-            def sanitize_value(v):
-                # Handle numpy arrays explicitly to avoid ambiguous truth value
-                if isinstance(v, np.ndarray):
-                    if v.size == 0:
-                        return None
-                    v = v.tolist()
-                    try:
-                        return json.dumps(v, ensure_ascii=False, default=str)
-                    except Exception:
-                        return str(v)
+            # Optional: normalize dict/list columns that should be strings in the schema
+            def to_json_string(value):
+                if isinstance(value, (dict, list)):
+                    return json.dumps(value, ensure_ascii=False)
+                return value
 
-                # Handle dicts and lists
-                if isinstance(v, (dict, list)):
-                    if isinstance(v, dict) and not v:
-                        return None
-                    if isinstance(v, list) and len(v) == 0:
-                        return None
-                    try:
-                        return json.dumps(v, ensure_ascii=False, default=str)
-                    except Exception:
-                        return str(v)
+            if self.string_like_columns:
+                for column_name in self.string_like_columns:
+                    if column_name in data.columns:
+                        data[column_name] = data[column_name].map(to_json_string)
 
-                # Only call pd.isna for scalar values
-                try:
-                    import pandas.api.types as ptypes
-                    if ptypes.is_scalar(v) and pd.isna(v):
-                        return None
-                except Exception:
-                    pass
-
-                return v
-
-            # Apply sanitization and cast object columns to pandas nullable string
-            for col in data.columns:
-                data[col] = data[col].apply(sanitize_value)
-                if data[col].dtype == object:
-                    data[col] = data[col].astype('string')
-
-            data.to_parquet(self.parquet_path)
-            # Check number of rows in the saved Parquet file
-            try:
-                df_check = pd.read_parquet(self.parquet_path)
-                self.logger.info(f'---- Number of rows in the saved Parquet file: {len(df_check)}')
-            except Exception as e:
-                self.logger.error(f'Error reading Parquet file for row count: {e}')
-            self.logger.info(f"Successfully converted to {self.parquet_path}")
-        except Exception as e:
-            self.logger.error(f"Failed to convert to Parquet: {str(e)}")
-            raise S3UploaderError(f"Parquet conversion failed: {str(e)}")
-
-    def convert_to_parquet_pyarrow(self) -> None:
-        """
-        Convert JSON to Parquet using PyArrow instead of pandas.
-
-        Supports both NDJSON (one JSON object per line) and JSON array files.
-        Performs light preprocessing to replace empty dict/list with None to avoid
-        empty struct/list issues in Parquet.
-        """
-        if not self.json_path:
-            raise FileNotFoundError("JSON path not set")
-
-        self.logger.info(f"[PyArrow] Converting {self.json_path} to Parquet format")
-        try:
-            # Detect NDJSON vs JSON array by peeking first non-whitespace character
-            with open(self.json_path, 'r', encoding='utf-8') as f:
-                content_start = None
-                while True:
-                    ch = f.read(1)
-                    if not ch:
-                        break
-                    if not ch.isspace():
-                        content_start = ch
-                        break
-
-            def replace_empty(obj):
-                if isinstance(obj, dict):
-                    if not obj:
-                        return None
-                    return {k: replace_empty(v) for k, v in obj.items()}
-                if isinstance(obj, list):
-                    if len(obj) == 0:
-                        return None
-                    return [replace_empty(v) for v in obj]
-                if isinstance(obj, np.ndarray):
-                    if obj.size == 0:
-                        return None
-                    return obj.tolist()
-                return obj
-
-            if content_start == '{':
-                # Likely NDJSON (object per line) or a single object
-                # Try using pyarrow.json which expects NDJSON
-                try:
-                    table = paj.read_json(str(self.json_path))
-                except Exception:
-                    # Fallback: read lines manually and build pylist
-                    records = []
-                    with open(self.json_path, 'r', encoding='utf-8') as f:
-                        for line in f:
-                            line = line.strip()
-                            if not line:
-                                continue
-                            try:
-                                obj = json.loads(line)
-                            except Exception:
-                                continue
-                            records.append(replace_empty(obj))
-                    table = pa.Table.from_pylist(records)
-            else:
-                # Assume JSON array
-                with open(self.json_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                if isinstance(data, dict):
-                    data = [data]
-                records = [replace_empty(rec) for rec in data]
-                table = pa.Table.from_pylist(records)
-
+            # Optional: ensure timestamp columns are parsed as datetime with UTC
+            if self.timestamp_columns:
+                for column_name in self.timestamp_columns:
+                    if column_name in data.columns:
+                        data[column_name] = pd.to_datetime(data[column_name], errors='coerce', utc=True)
+            
+            # Convert to PyArrow Table with the defined schema
+            table = pa.Table.from_pandas(data, schema=self.pa_schema)
+            
             # Write Parquet with compression
             pq.write_table(table, str(self.parquet_path), compression='snappy')
 
@@ -260,14 +167,15 @@ class S3Uploader():
             try:
                 pf = pq.ParquetFile(str(self.parquet_path))
                 num_rows = pf.metadata.num_rows if pf.metadata is not None else None
-                self.logger.info(f"[PyArrow] Number of rows in saved Parquet file: {num_rows}")
+                self.logger.info(f"---- Number of rows in saved Parquet file: {num_rows}")
             except Exception as e:
-                self.logger.error(f"[PyArrow] Error reading Parquet file for row count: {e}")
+                self.logger.error(f"Error reading Parquet file for row count: {e}")
 
-            self.logger.info(f"[PyArrow] Successfully converted to {self.parquet_path}")
+            self.logger.info(f"Successfully converted to {self.parquet_path}")
         except Exception as e:
-            self.logger.error(f"[PyArrow] Failed to convert to Parquet: {str(e)}")
+            self.logger.error(f"Failed to convert to Parquet: {str(e)}")
             raise S3UploaderError(f"Parquet conversion failed: {str(e)}")
+
 
     def compress_to_gzip(self) -> None:
         """Compress Parquet file to gzip format."""
@@ -401,7 +309,6 @@ class S3Uploader():
         """
         try:
             self.convert_to_parquet()
-            # self.convert_to_parquet_pyarrow()
             self.compress_to_gzip()
             return self.upload_file()
         except S3UploaderError as e:
@@ -414,6 +321,7 @@ class NaNEncoder(json.JSONEncoder):
         if pd.isna(obj) or (isinstance(obj, float) and np.isnan(obj)):
             return ""
         return super().default(obj)
+
 
 def clean_nan_values(obj):
     """Recursively clean NaN values from dictionaries and lists"""

@@ -19,8 +19,6 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pyarrow.json as paj
-from scr.schema import schema as sch
-
 
 @dataclass
 class S3Config:
@@ -137,73 +135,56 @@ class S3Uploader():
             data = pd.read_json(self.json_path)
             self.logger.info(f'---- Write to Json - {len(data)} rows')
 
-            # Normalize dict/list columns that should be strings in the schema
-            string_like_columns = [
-                "data",
-                "event_properties",
-                "group_properties",
-                "groups",
-                "user_properties",
-            ]
+            # Sanitize all columns to avoid Arrow type inference issues
+            def sanitize_value(v):
+                # Handle numpy arrays explicitly to avoid ambiguous truth value
+                if isinstance(v, np.ndarray):
+                    if v.size == 0:
+                        return None
+                    v = v.tolist()
+                    try:
+                        return json.dumps(v, ensure_ascii=False, default=str)
+                    except Exception:
+                        return str(v)
 
-            def to_json_string(value):
-                if isinstance(value, (dict, list)):
-                    return json.dumps(value, ensure_ascii=False)
-                return value
+                # Handle dicts and lists
+                if isinstance(v, (dict, list)):
+                    if isinstance(v, dict) and not v:
+                        return None
+                    if isinstance(v, list) and len(v) == 0:
+                        return None
+                    try:
+                        return json.dumps(v, ensure_ascii=False, default=str)
+                    except Exception:
+                        return str(v)
 
-            for column_name in string_like_columns:
-                if column_name in data.columns:
-                    data[column_name] = data[column_name].map(to_json_string)
+                # Only call pd.isna for scalar values
+                try:
+                    import pandas.api.types as ptypes
+                    if ptypes.is_scalar(v) and pd.isna(v):
+                        return None
+                except Exception:
+                    pass
 
-            # Optional: ensure timestamp columns are parsed as datetime with UTC
-            timestamp_columns = [
-                "client_event_time",
-                "client_upload_time",
-                "event_time",
-                "processed_time",
-                "server_received_time",
-                "server_upload_time",
-                "user_creation_time",
-            ]
-            for column_name in timestamp_columns:
-                if column_name in data.columns:
-                    data[column_name] = pd.to_datetime(data[column_name], errors='coerce', utc=True)
+                return v
 
-            # Define a schema 
-            schema = sch
+            # Apply sanitization and cast object columns to pandas nullable string
+            for col in data.columns:
+                data[col] = data[col].apply(sanitize_value)
+                if data[col].dtype == object:
+                    data[col] = data[col].astype('string')
 
-            # Convert to PyArrow Table with the defined schema
-            table = pa.Table.from_pandas(data, schema=schema)
-            
-            # Write Parquet with compression
-            pq.write_table(table, str(self.parquet_path), compression='snappy')
-
-            # Verify number of rows
+            data.to_parquet(self.parquet_path)
+            # Check number of rows in the saved Parquet file
             try:
-                pf = pq.ParquetFile(str(self.parquet_path))
-                num_rows = pf.metadata.num_rows if pf.metadata is not None else None
-                self.logger.info(f"[PyArrow] Number of rows in saved Parquet file: {num_rows}")
+                df_check = pd.read_parquet(self.parquet_path)
+                self.logger.info(f'---- Number of rows in the saved Parquet file: {len(df_check)}')
             except Exception as e:
-                self.logger.error(f"[PyArrow] Error reading Parquet file for row count: {e}")
-
-            self.logger.info(f"[PyArrow] Successfully converted to {self.parquet_path}")
+                self.logger.error(f'Error reading Parquet file for row count: {e}')
+            self.logger.info(f"Successfully converted to {self.parquet_path}")
         except Exception as e:
-            self.logger.error(f"[PyArrow] Failed to convert to Parquet: {str(e)}")
+            self.logger.error(f"Failed to convert to Parquet: {str(e)}")
             raise S3UploaderError(f"Parquet conversion failed: {str(e)}")
-
-
-
-        #     data.to_parquet(self.parquet_path)
-        #     # Check number of rows in the saved Parquet file
-        #     try:
-        #         df_check = pd.read_parquet(self.parquet_path)
-        #         self.logger.info(f'---- Number of rows in the saved Parquet file: {len(df_check)}')
-        #     except Exception as e:
-        #         self.logger.error(f'Error reading Parquet file for row count: {e}')
-        #     self.logger.info(f"Successfully converted to {self.parquet_path}")
-        # except Exception as e:
-        #     self.logger.error(f"Failed to convert to Parquet: {str(e)}")
-        #     raise S3UploaderError(f"Parquet conversion failed: {str(e)}")
 
     def convert_to_parquet_pyarrow(self) -> None:
         """
@@ -422,7 +403,7 @@ class S3Uploader():
             self.convert_to_parquet()
             # self.convert_to_parquet_pyarrow()
             self.compress_to_gzip()
-            # return self.upload_file()
+            return self.upload_file()
         except S3UploaderError as e:
             self.logger.error(f"Upload process failed: {str(e)}")
             raise
@@ -433,7 +414,6 @@ class NaNEncoder(json.JSONEncoder):
         if pd.isna(obj) or (isinstance(obj, float) and np.isnan(obj)):
             return ""
         return super().default(obj)
-
 
 def clean_nan_values(obj):
     """Recursively clean NaN values from dictionaries and lists"""
