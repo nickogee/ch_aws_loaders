@@ -18,8 +18,8 @@ from google.cloud import bigquery
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
-import pyarrow.json as paj
-from scr.schema import schema as sch
+# import pyarrow.json as paj
+# from scr.schema import schema as sch
 
 
 @dataclass
@@ -49,7 +49,7 @@ class S3UploadError(S3UploaderError):
 class S3Uploader():
     """Handles the process of converting, compressing, and uploading files to S3."""
 
-    def __init__(self, entity_path: str, dt_partition: datetime, pa_schema: pa.Schema, timestamp_columns: Optional[list], string_like_columns: Optional[list], dt_now: Optional[datetime] = None):
+    def __init__(self, entity_path: str, dt_partition: datetime, pa_schema: pa.Schema, timestamp_columns: Optional[list] = None, string_like_columns: Optional[list] = None, dt_now: Optional[datetime] = None):
         """
         Initialize the S3Uploader.
 
@@ -310,7 +310,7 @@ class S3Uploader():
         try:
             self.convert_to_parquet()
             self.compress_to_gzip()
-            return self.upload_file()
+            # return self.upload_file()
         except S3UploaderError as e:
             self.logger.error(f"Upload process failed: {str(e)}")
             raise

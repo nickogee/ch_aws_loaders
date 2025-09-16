@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import pyarrow as pa
 from scr.BigqueryShcemaToPyarrow import get_pyarrow_schema_from_bq
  
-
+pa_schema = None
 pa_schema = pa.schema([
     pa.field("adid", pa.float64()),
     pa.field("amplitude_attribution_ids", pa.list_(pa.null())),
@@ -77,15 +77,17 @@ if __name__ == '__main__':
 
     with BigQueryExporter() as exporter:
         
-        exporter.raw_dt = '20250911'
+        exporter.raw_dt = '20250908'
         exporter.dt = datetime.strptime(str(exporter.raw_dt), '%Y%m%d').strftime('%Y-%m-%d')
         
         # bq_table_addres = 'organic-reef-315010.amplitude_ryadom_user_app.EVENTS_296820'
         # quickfix RDA-544
         bq_table_addres = 'organic-reef-315010.indrive.amplitude_event_wo_dma'
+        # bq_table_addres = 'organic-reef-315010.amplitude_ryadom_and_superapp_dev.EVENTS_415370'
         s3_entity_path = 'partner_metrics/amplitude'
         where_condition = f"(lower(json_extract_scalar(event_properties,'$.user_agent')) like '%indrive%' or json_extract_scalar(event_properties, '$.currentApp' ) ='miniApp_inDrive') AND timestamp_trunc(event_time, day) = '{exporter.dt}'"
-        
+        # where_condition = 'True'
+
         # Build query using schema
         query = exporter.build_query(bq_table_addres=bq_table_addres, where_condition=where_condition)
         print(f"Generated query:\n{query}")

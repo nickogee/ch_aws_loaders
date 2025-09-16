@@ -1,12 +1,5 @@
 from typing import Iterable, Optional
 from config.cred.enviroment import Environment
-
-
-# try:
-#     from google.cloud import bigquery  # type: ignore
-# except Exception:  # pragma: no cover
-#     bigquery = None  # Allows type-free usage when google-cloud-bigquery isn't installed
-
 import pyarrow as pa
 
 
