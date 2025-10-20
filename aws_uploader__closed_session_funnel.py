@@ -20,7 +20,7 @@ if __name__ == '__main__':
 
     with BigQueryExporter() as exporter:
         
-        exporter.raw_dt = '20250915'
+        exporter.raw_dt = '20250922'
         exporter.dt = datetime.strptime(str(exporter.raw_dt), '%Y%m%d').strftime('%Y-%m-%d')
         
         bq_table_addres = 'organic-reef-315010.indrive.closed_session_funnel'
@@ -34,6 +34,8 @@ if __name__ == '__main__':
         temp_json_path = exporter.export_to_json(query, bq_table_addres)
         if temp_json_path:
             print(f"Data exported to temporary file: {temp_json_path}")
+        
+        parquet_gz_path = exporter.export_to_parquet_gzip(query, schema=pa_schema, bq_table_addres=bq_table_addres)
         
         ##############################
 

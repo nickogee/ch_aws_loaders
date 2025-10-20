@@ -16,10 +16,7 @@ import json
 import tempfile
 from google.cloud import bigquery
 import numpy as np
-import pyarrow as pa
-import pyarrow.parquet as pq
-# import pyarrow.json as paj
-# from scr.schema import schema as sch
+
 
 
 @dataclass
@@ -49,7 +46,8 @@ class S3UploadError(S3UploaderError):
 class S3Uploader():
     """Handles the process of converting, compressing, and uploading files to S3."""
 
-    def __init__(self, entity_path: str, dt_partition: datetime, pa_schema: pa.Schema, timestamp_columns: Optional[list] = None, string_like_columns: Optional[list] = None, dt_now: Optional[datetime] = None):
+    def __init__(self, entity_path: str, dt_partition: datetime, gzip_path: str, dt_now: Optional[datetime] = None):
+
         """
         Initialize the S3Uploader.
 
@@ -64,9 +62,7 @@ class S3Uploader():
         self.dt_now = dt_now or datetime.now(timezone.utc)
         self.dt_partition = dt_partition
         self.hash_string = self._generate_hash(8)
-        self.pa_schema = pa_schema
-        self.timestamp_columns = timestamp_columns
-        self.string_like_columns = string_like_columns
+        self.gzip_path =  Path(f"{gzip_path}")
         self._setup_paths()
         self._setup_s3_client()
 
@@ -90,10 +86,8 @@ class S3Uploader():
 
     def _setup_paths(self) -> None:
         """Initialize file paths."""
-        self.json_path: Optional[Path] = None
-        self.parquet_path: Optional[Path] = None
-        self.gzip_path: Optional[Path] = None
         self.s3_parent_path_file_key = f'{self.entity_path}/{self.dt_partition:%Y-%m-%d}/'
+        # self.s3_full_file_key = f'partner_metrics/amplitude_v2/2025-09-24/{self.hash_string}_{self.dt_now:%H:%M:%S}.parquet.gz'
         self.s3_full_file_key = (
             self.s3_parent_path_file_key + f'{self.hash_string}_{self.dt_now:%H:%M:%S}.parquet.gz'
         )
@@ -114,82 +108,6 @@ class S3Uploader():
         """Generate a random hash string of specified length."""
         return str(uuid.uuid4())[:n]
 
-    def set_json_path(self, path: str) -> None:
-        """
-        Set the JSON file path and derive other paths.
-
-        Args:
-            path: Path to the JSON file
-        """
-        self.json_path = Path(path)
-        if not self.json_path.exists():
-            raise FileNotFoundError(f"JSON file not found: {path}")
-        
-        # Derive other paths
-        base_path = str(self.json_path)[:str(self.json_path).rfind(".json")]
-        self.parquet_path = Path(f"{base_path}.parquet")
-        self.gzip_path = Path(f"{base_path}.parquet.gz")
-
-    def convert_to_parquet(self) -> None:
-        """Convert JSON file to Parquet format."""
-        if not self.json_path:
-            raise FileNotFoundError("JSON path not set")
-
-        self.logger.info(f"Converting {self.json_path} to Parquet format")
-        try:
-            data = pd.read_json(self.json_path)
-            self.logger.info(f'---- Write to Json - {len(data)} rows')
-
-            # Optional: normalize dict/list columns that should be strings in the schema
-            def to_json_string(value):
-                if isinstance(value, (dict, list)):
-                    return json.dumps(value, ensure_ascii=False)
-                return value
-
-            if self.string_like_columns:
-                for column_name in self.string_like_columns:
-                    if column_name in data.columns:
-                        data[column_name] = data[column_name].map(to_json_string)
-
-            # Optional: ensure timestamp columns are parsed as datetime with UTC
-            if self.timestamp_columns:
-                for column_name in self.timestamp_columns:
-                    if column_name in data.columns:
-                        data[column_name] = pd.to_datetime(data[column_name], errors='coerce', utc=True)
-            
-            # Convert to PyArrow Table with the defined schema
-            table = pa.Table.from_pandas(data, schema=self.pa_schema)
-            
-            # Write Parquet with compression
-            pq.write_table(table, str(self.parquet_path), compression='snappy')
-
-            # Verify number of rows
-            try:
-                pf = pq.ParquetFile(str(self.parquet_path))
-                num_rows = pf.metadata.num_rows if pf.metadata is not None else None
-                self.logger.info(f"---- Number of rows in saved Parquet file: {num_rows}")
-            except Exception as e:
-                self.logger.error(f"Error reading Parquet file for row count: {e}")
-
-            self.logger.info(f"Successfully converted to {self.parquet_path}")
-        except Exception as e:
-            self.logger.error(f"Failed to convert to Parquet: {str(e)}")
-            raise S3UploaderError(f"Parquet conversion failed: {str(e)}")
-
-
-    def compress_to_gzip(self) -> None:
-        """Compress Parquet file to gzip format."""
-        if not self.parquet_path or not self.parquet_path.exists():
-            raise FileNotFoundError(f"Parquet file not found: {self.parquet_path}")
-
-        self.logger.info(f"Compressing {self.parquet_path} to gzip format")
-        try:
-            with open(self.parquet_path, 'rb') as src, gzip.open(self.gzip_path, 'wb') as dst:
-                dst.writelines(src)
-            self.logger.info(f"Successfully compressed to {self.gzip_path}")
-        except Exception as e:
-            self.logger.error(f"Failed to compress to gzip: {str(e)}")
-            raise S3UploaderError(f"Gzip compression failed: {str(e)}")
 
     def _clear_s3_path(self, s3_path: str) -> None:
         """
@@ -308,9 +226,7 @@ class S3Uploader():
             S3UploaderError: If any step in the process fails
         """
         try:
-            self.convert_to_parquet()
-            self.compress_to_gzip()
-            # return self.upload_file()
+            return self.upload_file()
         except S3UploaderError as e:
             self.logger.error(f"Upload process failed: {str(e)}")
             raise
