@@ -294,7 +294,8 @@ class S3LogsToBigQueryLoader:
         self.logger.info(f"Found {len(s3_files)} files to process.")
 
         all_records = []
-        with tempfile.TemporaryDirectory() as tmpdir:
+        # with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory(dir='/Users/hachimantaro/Repo/choco_projects/ch_indrive_aws_s3/temp') as tmpdir:
             for s3_key in s3_files:
                 local_path = Path(tmpdir) / Path(s3_key).name
                 self.logger.info(f"Downloading {s3_key} to {local_path}")

@@ -7,32 +7,41 @@ from scr.BigqueryShcemaToPyarrow import get_pyarrow_schema_from_bq
 pa_schema = None
 
 pa_schema = pa.schema([
+    pa.field("analytical_category_id", pa.int64()),
+    pa.field("brand_id", pa.int64()),
+    pa.field("country", pa.string()),
+    pa.field("created_at", pa.timestamp('us', tz='UTC')),
+    pa.field("daily_max_quantity", pa.int64()),
+    pa.field("degree_level", pa.int64()),
+    pa.field("degree_value", pa.float64()),
+    pa.field("depth", pa.float64()),
+    pa.field("full_description", pa.string()),
+    pa.field("full_description_kk", pa.string()),
+    pa.field("has_brand", pa.bool_()),
+    pa.field("height", pa.float64()),
+    pa.field("id", pa.int64()),
+    pa.field("is_active", pa.bool_()),
+    pa.field("is_sample", pa.bool_()),
+    pa.field("keywords", pa.string()),
+    pa.field("keywords_kk", pa.string()),
+    pa.field("labels", pa.string()),
+    pa.field("max_quantity", pa.int64()),
     pa.field("name", pa.string()),
-    pa.field("user_id", pa.string()),
-    pa.field("city_name", pa.string()),
-    pa.field("county_code", pa.string()),
-    pa.field("event_id", pa.string()),
-    pa.field("currency", pa.string()),
-    pa.field("actual_delivery_time", pa.timestamp('us', tz='UTC')),
-    pa.field("order_creation_time", pa.timestamp('us', tz='UTC')),
-    pa.field("min_promised_delivery_time", pa.int64()),
-    pa.field("max_promised_delivery_time", pa.int64()),
-    pa.field(
-        "delivered_products",
-        pa.list_(
-            pa.struct([
-                pa.field("name", pa.string()),
-                pa.field("id", pa.int64()),
-                pa.field("price", pa.int64()),
-                pa.field("original_price", pa.int64()),
-                pa.field("quantity", pa.int64())
-            ])
-        )
-    ),
-    pa.field("order_id", pa.string()),
-    pa.field("payment_id", pa.string()),
-    pa.field("promocode_name", pa.string()),
-    pa.field("promocode_conditions", pa.string()),
+    pa.field("name_kk", pa.string()),
+    pa.field("name_origin", pa.string()),
+    pa.field("name_short", pa.string()),
+    pa.field("name_short_kk", pa.string()),
+    pa.field("one_day_sale", pa.bool_()),
+    pa.field("sort_weight", pa.int64()),
+    pa.field("type_uuid", pa.string()),
+    pa.field("uuid", pa.string()),
+    pa.field("weight", pa.int64()),
+    pa.field("weight_visible", pa.bool_()),
+    pa.field("width", pa.float64()),
+    pa.field("wine_color", pa.string()),
+    pa.field("wine_sugar_content", pa.string()),
+    pa.field("is_promo", pa.bool_()),
+    pa.field("is_coffee", pa.bool_()),
 ])
 
 
@@ -40,15 +49,14 @@ if __name__ == '__main__':
 
     with BigQueryExporter() as exporter:
         
-        exporter.raw_dt = '20250903'
+        exporter.raw_dt = '20251105'
         exporter.dt = datetime.strptime(str(exporter.raw_dt), '%Y%m%d').strftime('%Y-%m-%d')
         
-        bq_table_addres = 'organic-reef-315010.indrive_dev.indrive__backend_events_order_delivered'
-        s3_entity_path = 'partner_metrics/backend_events/delivered_orders'
-        where_condition = f"timestamp_trunc(order_creation_time, day) = '{exporter.dt}'"
-
+        bq_table_addres = 'organic-reef-315010.indrive.indrive__catalogs_products'
+        s3_entity_path = 'partner_metrics/catalogs/products'
+        
         # Build query using schema
-        query = exporter.build_query(bq_table_addres=bq_table_addres, where_condition=where_condition)
+        query = exporter.build_query(bq_table_addres=bq_table_addres)
         print(f"Generated query:\n{query}")
         
         if not pa_schema:  

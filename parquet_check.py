@@ -1,7 +1,7 @@
 import pyarrow.parquet as pq
 
-amplitude_08 = pq.read_table('temp/bigquery_export_u1fhyw63/export_organic-reef-315010.indrive_dev.indrive__backend_events_order_delivered_20251014_161334.parquet')
-amplitude_04 = pq.read_table('temp/bigquery_export_vbdgm_f5/export_organic-reef-315010.indrive_dev.indrive__backend_events_order_delivered_20251014_161731.parquet')
+amplitude_08 = pq.read_table('temp/bigquery_export__dz1jyec/export_organic-reef-315010.indrive.indrive__backend_events_cancelled_orders_20251022_152626.parquet')
+amplitude_04 = pq.read_table('temp/bigquery_export__u40lq5i/export_organic-reef-315010.indrive.indrive__backend_events_cancelled_orders_20251022_151814.parquet')
 
 # Print differences between the two schemas
 schema_08 = amplitude_08.schema
@@ -11,7 +11,6 @@ fields_08 = {f.name: f for f in schema_08}
 fields_04 = {f.name: f for f in schema_04}
 
 # with open('temp/old_schema.txt', 'w', encoding='utf-8') as f:
-#     # f.write("Schema for amplitude_08:\n")
 #     for name, field in fields_04.items():
 #         f.write(f"  {name}: {field.type}\n")
 

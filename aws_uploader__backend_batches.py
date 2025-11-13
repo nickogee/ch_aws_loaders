@@ -5,34 +5,20 @@ import pyarrow as pa
 from scr.BigqueryShcemaToPyarrow import get_pyarrow_schema_from_bq
  
 pa_schema = None
-
 pa_schema = pa.schema([
-    pa.field("name", pa.string()),
-    pa.field("user_id", pa.string()),
-    pa.field("city_name", pa.string()),
-    pa.field("county_code", pa.string()),
-    pa.field("event_id", pa.string()),
-    pa.field("currency", pa.string()),
-    pa.field("actual_delivery_time", pa.timestamp('us', tz='UTC')),
-    pa.field("order_creation_time", pa.timestamp('us', tz='UTC')),
-    pa.field("min_promised_delivery_time", pa.int64()),
-    pa.field("max_promised_delivery_time", pa.int64()),
-    pa.field(
-        "delivered_products",
-        pa.list_(
-            pa.struct([
-                pa.field("name", pa.string()),
-                pa.field("id", pa.int64()),
-                pa.field("price", pa.int64()),
-                pa.field("original_price", pa.int64()),
-                pa.field("quantity", pa.int64())
-            ])
-        )
-    ),
-    pa.field("order_id", pa.string()),
-    pa.field("payment_id", pa.string()),
-    pa.field("promocode_name", pa.string()),
-    pa.field("promocode_conditions", pa.string()),
+    pa.field("batch_type", pa.string()),
+    pa.field("created_at", pa.timestamp('us', tz='UTC')),
+    pa.field("delivery_type", pa.int64()),
+    pa.field("id", pa.int64()),
+    pa.field("latitude", pa.float64()),
+    pa.field("longitude", pa.float64()),
+    pa.field("max_quantity", pa.int64()),
+    pa.field("ready_time", pa.timestamp('us', tz='UTC')),
+    pa.field("status", pa.int64()),
+    pa.field("updated_at", pa.timestamp('us', tz='UTC')),
+    pa.field("version", pa.int64()),
+    pa.field("warehouse_id", pa.int64()),
+    pa.field("launch_id", pa.string()),
 ])
 
 
@@ -40,12 +26,12 @@ if __name__ == '__main__':
 
     with BigQueryExporter() as exporter:
         
-        exporter.raw_dt = '20250903'
+        exporter.raw_dt = '20251101'
         exporter.dt = datetime.strptime(str(exporter.raw_dt), '%Y%m%d').strftime('%Y-%m-%d')
         
-        bq_table_addres = 'organic-reef-315010.indrive_dev.indrive__backend_events_order_delivered'
-        s3_entity_path = 'partner_metrics/backend_events/delivered_orders'
-        where_condition = f"timestamp_trunc(order_creation_time, day) = '{exporter.dt}'"
+        bq_table_addres = 'organic-reef-315010.snp.batches'
+        s3_entity_path = 'partner_metrics/backend/batches'
+        where_condition = f"timestamp_trunc(created_at, day) = '{exporter.dt}'"
 
         # Build query using schema
         query = exporter.build_query(bq_table_addres=bq_table_addres, where_condition=where_condition)

@@ -5,20 +5,22 @@ import pyarrow as pa
 from scr.BigqueryShcemaToPyarrow import get_pyarrow_schema_from_bq
  
 pa_schema = None
-
 pa_schema = pa.schema([
     pa.field("name", pa.string()),
     pa.field("user_id", pa.string()),
     pa.field("city_name", pa.string()),
-    pa.field("county_code", pa.string()),
+    pa.field("country_code", pa.string()),
     pa.field("event_id", pa.string()),
     pa.field("currency", pa.string()),
-    pa.field("actual_delivery_time", pa.timestamp('us', tz='UTC')),
+    pa.field("actual_cancellation_time", pa.timestamp('us', tz='UTC')),
     pa.field("order_creation_time", pa.timestamp('us', tz='UTC')),
     pa.field("min_promised_delivery_time", pa.int64()),
     pa.field("max_promised_delivery_time", pa.int64()),
+    pa.field("cancel_reason", pa.string()),
+    pa.field("cancel_stage", pa.string()),
+    pa.field("cancel_initiator", pa.string()),
     pa.field(
-        "delivered_products",
+        "cart",
         pa.list_(
             pa.struct([
                 pa.field("name", pa.string()),
@@ -29,10 +31,10 @@ pa_schema = pa.schema([
             ])
         )
     ),
-    pa.field("order_id", pa.string()),
+    pa.field("order_id", pa.int64()),
     pa.field("payment_id", pa.string()),
     pa.field("promocode_name", pa.string()),
-    pa.field("promocode_conditions", pa.string()),
+    pa.field("promocode_conditions", pa.string()), 
 ])
 
 
@@ -40,11 +42,11 @@ if __name__ == '__main__':
 
     with BigQueryExporter() as exporter:
         
-        exporter.raw_dt = '20250903'
+        exporter.raw_dt = '20251011'
         exporter.dt = datetime.strptime(str(exporter.raw_dt), '%Y%m%d').strftime('%Y-%m-%d')
         
-        bq_table_addres = 'organic-reef-315010.indrive_dev.indrive__backend_events_order_delivered'
-        s3_entity_path = 'partner_metrics/backend_events/delivered_orders'
+        bq_table_addres = 'organic-reef-315010.indrive_dev.indrive__backend_events_cancelled_orders'
+        s3_entity_path = 'partner_metrics/backend_events/cancelled_orders'
         where_condition = f"timestamp_trunc(order_creation_time, day) = '{exporter.dt}'"
 
         # Build query using schema
@@ -53,11 +55,10 @@ if __name__ == '__main__':
         
         if not pa_schema:  
             pa_schema = get_pyarrow_schema_from_bq(table_id=bq_table_addres)  
-            
-        print('===== Used schema:', pa_schema, sep='\n')
+        
+        print('=====  Used Schema:', pa_schema, sep='\n')
 
         parquet_gz_path = exporter.export_to_parquet_gzip(query, schema=pa_schema, bq_table_addres=bq_table_addres)
-        # parquet_gz_path = 'temp/bigquery_export_vbdgm_f5/export_organic-reef-315010.indrive_dev.indrive__backend_events_order_delivered_20251014_161731.parquet.gz'
         ##############################
 
         if parquet_gz_path:
