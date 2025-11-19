@@ -37,7 +37,7 @@ pa_schema = pa.schema([
     pa.field("less_packages", pa.bool_()),
     pa.field("min_amount", pa.int64()),
     pa.field("courier_order_id", pa.int64()),
-    pa.field("order_items", pa.list_(
+    pa.field("order_items", 
         pa.struct([
             pa.field("is_available", pa.bool_()),
             pa.field("mark", pa.string()),
@@ -56,7 +56,7 @@ pa_schema = pa.schema([
             pa.field("promo_source", pa.int64()),
             pa.field("promo_source_id", pa.int64()),
         ])
-    )),
+    ),
     pa.field("payment_method", pa.string()),
     pa.field("picker_assigned_at", pa.timestamp("us", tz="UTC")),
     pa.field("price", pa.int64()),
@@ -79,7 +79,7 @@ if __name__ == '__main__':
 
     with BigQueryExporter() as exporter:
         
-        exporter.raw_dt = '20251101'
+        exporter.raw_dt = '20251117'
         exporter.dt = datetime.strptime(str(exporter.raw_dt), '%Y%m%d').strftime('%Y-%m-%d')
         
         bq_table_addres = 'organic-reef-315010.indrive.indrive__backend_orders'
@@ -92,8 +92,7 @@ if __name__ == '__main__':
         
         if not pa_schema:  
             pa_schema = get_pyarrow_schema_from_bq(table_id=bq_table_addres)  
-            
-        print('===== Used schema:', pa_schema, sep='\n')
+            print('===== Generate schema:', pa_schema, sep='\n')
 
         parquet_gz_path = exporter.export_to_parquet_gzip(query, schema=pa_schema, bq_table_addres=bq_table_addres)
         # parquet_gz_path = 'temp/bigquery_export_vbdgm_f5/export_organic-reef-315010.indrive_dev.indrive__backend_events_order_delivered_20251014_161731.parquet.gz'

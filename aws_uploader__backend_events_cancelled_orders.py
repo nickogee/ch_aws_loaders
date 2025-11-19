@@ -21,7 +21,6 @@ pa_schema = pa.schema([
     pa.field("cancel_initiator", pa.string()),
     pa.field(
         "cart",
-        pa.list_(
             pa.struct([
                 pa.field("name", pa.string()),
                 pa.field("id", pa.int64()),
@@ -29,8 +28,7 @@ pa_schema = pa.schema([
                 pa.field("original_price", pa.int64()),
                 pa.field("quantity", pa.int64())
             ])
-        )
-    ),
+        ),
     pa.field("order_id", pa.int64()),
     pa.field("payment_id", pa.string()),
     pa.field("promocode_name", pa.string()),
@@ -42,10 +40,10 @@ if __name__ == '__main__':
 
     with BigQueryExporter() as exporter:
         
-        exporter.raw_dt = '20251011'
+        exporter.raw_dt = '20251117'
         exporter.dt = datetime.strptime(str(exporter.raw_dt), '%Y%m%d').strftime('%Y-%m-%d')
         
-        bq_table_addres = 'organic-reef-315010.indrive_dev.indrive__backend_events_cancelled_orders'
+        bq_table_addres = 'organic-reef-315010.indrive.indrive__backend_events_cancelled_orders'
         s3_entity_path = 'partner_metrics/backend_events/cancelled_orders'
         where_condition = f"timestamp_trunc(order_creation_time, day) = '{exporter.dt}'"
 
@@ -55,8 +53,7 @@ if __name__ == '__main__':
         
         if not pa_schema:  
             pa_schema = get_pyarrow_schema_from_bq(table_id=bq_table_addres)  
-        
-        print('=====  Used Schema:', pa_schema, sep='\n')
+            print('=====  Generate Schema:', pa_schema, sep='\n')
 
         parquet_gz_path = exporter.export_to_parquet_gzip(query, schema=pa_schema, bq_table_addres=bq_table_addres)
         ##############################

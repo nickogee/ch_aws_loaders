@@ -11,12 +11,12 @@ if __name__ == '__main__':
         
         # start_date = s3_importer.dt
         start_date = '2025-11-01'
-        s3_entity_path = 'partner_metrics/backend/warehouse_products/'
+        s3_entity_path = 'partner_metrics/backend_events/cancelled_orders/'
         bq_schema_path = 'organic-reef-315010.indrive_dev'
         
         s3_prefix = f'{s3_entity_path}{start_date}/' 
         # table_name = s3_entity_path.replace('/', '-')[:len(s3_entity_path)-1] # S3 folder to scan for *.log.gz or *.parquet.gz
-        table_name = 'test_warehouse_products'
+        table_name = 'test_cancelled_orders'
 
         
         bq_table = f'{bq_schema_path}.{table_name}'  # BigQuery table to load into

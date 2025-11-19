@@ -7,20 +7,32 @@ import time
 
 pa_schema = None
 pa_schema = pa.schema([
-    pa.field("batch_type", pa.string()),
-    pa.field("created_at", pa.timestamp('us', tz='UTC')),
-    pa.field("delivery_type", pa.int64()),
-    pa.field("id", pa.int64()),
-    pa.field("latitude", pa.float64()),
-    pa.field("longitude", pa.float64()),
-    pa.field("max_quantity", pa.int64()),
-    pa.field("ready_time", pa.timestamp('us', tz='UTC')),
-    pa.field("status", pa.int64()),
-    pa.field("updated_at", pa.timestamp('us', tz='UTC')),
-    pa.field("version", pa.int64()),
-    pa.field("warehouse_id", pa.int64()),
-    pa.field("launch_id", pa.string()),
+    pa.field("name", pa.string()),
+    pa.field("user_id", pa.string()),
+    pa.field("city_name", pa.string()),
+    pa.field("county_code", pa.string()),
+    pa.field("event_id", pa.string()),
+    pa.field("currency", pa.string()),
+    pa.field("actual_delivery_time", pa.timestamp('us', tz='UTC')),
+    pa.field("order_creation_time", pa.timestamp('us', tz='UTC')),
+    pa.field("min_promised_delivery_time", pa.int64()),
+    pa.field("max_promised_delivery_time", pa.int64()),
+    pa.field(
+        "delivered_products",
+            pa.struct([
+                pa.field("name", pa.string()),
+                pa.field("id", pa.int64()),
+                pa.field("price", pa.int64()),
+                pa.field("original_price", pa.int64()),
+                pa.field("quantity", pa.int64())
+            ])
+        ),
+    pa.field("order_id", pa.string()),
+    pa.field("payment_id", pa.string()),
+    pa.field("promocode_name", pa.string()),
+    pa.field("promocode_conditions", pa.string()),
 ])
+
 
 
 
@@ -29,7 +41,8 @@ def process_single_date(raw_dt, bq_table_addres, s3_entity_path, pa_schema):
     with BigQueryExporter() as exporter:
         exporter.raw_dt = raw_dt
         exporter.dt = datetime.strptime(str(exporter.raw_dt), '%Y%m%d').strftime('%Y-%m-%d')    
-        where_condition = f"timestamp_trunc(created_at, day) = '{exporter.dt}'"
+        
+        where_condition = f"timestamp_trunc(order_creation_time, day) = '{exporter.dt}'"
 
         # Build query using schema
         query = exporter.build_query(bq_table_addres=bq_table_addres, where_condition=where_condition)
@@ -70,13 +83,12 @@ def generate_date_range(start_date_str, end_date_str):
 
 if __name__ == '__main__':
     # Define date range - modify these dates as needed
-    start_date = '20250701'  # Start date in YYYYMMDD format
-    end_date = '20251112'    # End date in YYYYMMDD format
+    start_date = '20251115'  # Start date in YYYYMMDD format
+    end_date = '20251117'    # End date in YYYYMMDD format
     
-    bq_table_addres = 'organic-reef-315010.snp.batches'
-    s3_entity_path = 'partner_metrics/backend/batches'
-            
-
+    bq_table_addres = 'organic-reef-315010.indrive.indrive__backend_events_order_delivered'
+    s3_entity_path = 'partner_metrics/backend_events/delivered_orders'
+                                                    
     # Generate schema once
     if not pa_schema:  
         pa_schema = get_pyarrow_schema_from_bq(table_id=bq_table_addres)  
@@ -94,7 +106,7 @@ if __name__ == '__main__':
         try:
             success = process_single_date(raw_dt, bq_table_addres, s3_entity_path, pa_schema)
             
-            # time.sleep(2)
+            time.sleep(2)
             if success:
                 success_count += 1
         except Exception as e:

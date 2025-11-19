@@ -133,7 +133,7 @@ class BigQueryExporter():
             new_fields.append(pa.field(f.name, target_type, nullable=True))
         return pa.schema(new_fields)
 
-    def export_to_parquet(self, query: str, bq_table_addres: Optional[str] = None, schema: Optional[pa.Schema] = None, compression: str = 'snappy') -> str:
+    def export_to_parquet(self, query: str, bq_table_addres: Optional[str] = None, schema: Optional[pa.Schema] = None, compression: str = 'snappy', use_compliant_nested_type: bool = True) -> str:
         """
         Execute query and write a Parquet file in the exporter temp dir.
 
@@ -142,10 +142,13 @@ class BigQueryExporter():
             bq_table_addres: Optional basename for parquet; defaults to generated name
             schema: Optional pyarrow.Schema to align/cast before write
             compression: Parquet compression, default 'snappy'
+            use_compliant_nested_type: If False, uses new format with "<item>" for list items.
+                                       If True (default), uses legacy format with "<element>" for list items.
+                                       Set explicitly to ensure consistency across exports.
         Returns:
             Absolute path to the written .parquet file
         """
-        self.logger.info(f"Starting Parquet export with compression: {compression}")
+        self.logger.info(f"Starting Parquet export with compression: {compression}, use_compliant_nested_type: {use_compliant_nested_type}")
         table = self.to_arrow(query)
 
         if schema is not None:
@@ -169,21 +172,47 @@ class BigQueryExporter():
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         base = os.path.join(self.temp_dir, f"export_{bq_table_addres}_{ts}.parquet")
         out_path = Path(self.temp_dir) / base
-        pq.write_table(table, str(out_path), compression=compression)
+        
+        # Use ParquetWriter with use_compliant_nested_type to control list format
+        # use_compliant_nested_type=True uses legacy format with "element"
+        # use_compliant_nested_type=False uses new format with "item"
+        try:
+            with pq.ParquetWriter(
+                str(out_path), 
+                table.schema, 
+                compression=compression,
+                use_compliant_nested_type=use_compliant_nested_type
+            ) as writer:
+                writer.write_table(table)
+        except Exception as e:
+            # Fallback if parameter is not supported
+            self.logger.warning(f"Could not set nested type format ({e}), using default write_table")
+            pq.write_table(table, str(out_path), compression=compression)
+
+        curent_file = pq.read_table(out_path)
+        print("===File schema===", curent_file.schema, sep='\n')
         self.logger.info(f"Parquet file written successfully: {out_path}")
         return str(out_path)
 
-    def export_to_parquet_gzip(self, query: str, bq_table_addres: Optional[str] = None, schema: Optional[pa.Schema] = None, compression: str = 'snappy') -> str:
+    def export_to_parquet_gzip(self, query: str, bq_table_addres: Optional[str] = None, schema: Optional[pa.Schema] = None, compression: str = 'snappy', use_compliant_nested_type: bool = True) -> str:
         """
         Execute query and write a gzipped Parquet file (.parquet.gz) in the exporter temp dir.
 
-        Returns path to the .parquet.gz file.
+        Args:
+            query: SQL query to execute
+            bq_table_addres: Optional basename for parquet
+            schema: Optional pyarrow.Schema to align/cast before write
+            compression: Parquet compression, default 'snappy'
+            use_compliant_nested_type: If False, uses new format with "<item>" for list items.
+                                       If True (default), uses legacy format with "<element>" for list items.
+        Returns:
+            Path to the .parquet.gz file.
         """
         self.logger.info(f"Starting Parquet.gz export for table: {bq_table_addres}")
         
         try:
             # Export to Parquet first
-            parquet_path = self.export_to_parquet(query, bq_table_addres=bq_table_addres, schema=schema, compression=compression)
+            parquet_path = self.export_to_parquet(query, bq_table_addres=bq_table_addres, schema=schema, compression=compression, use_compliant_nested_type=use_compliant_nested_type)
             self.logger.info(f"Parquet file created: {parquet_path}")
             
             # Create gzipped version

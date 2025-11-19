@@ -41,13 +41,13 @@ def delete_s3_file(bucket_obj, key: str):
         raise
 
 if __name__ == "__main__":
-    # # # Example: Download a file
-    # file_to_download_key = 'partner_metrics/backend_events/delivered_orders/init/2025-10-13/3bd7689a_11:25:31.parquet.gz'
-    # local_download_path = 'temp/delivered_orders_init.parquet.gz' # Downloads to the script's directory
-    # download_s3_file(your_bucket, file_to_download_key, local_download_path)
+    # # Example: Download a file
+    file_to_download_key = 'partner_metrics/backend_events/cancelled_orders/2025-11-15/68b608ac_08:55:15.parquet.gz'
+    local_download_path = 'temp/cancelled_orders_2025-11-15.parquet.gz' # Downloads to the script's directory
+    download_s3_file(your_bucket, file_to_download_key, local_download_path)
 
-    # Example: Delete a file (BE VERY CAREFUL WITH THIS)
-    # Make sure this is the correct file you want to delete.
-    file_to_delete_key = 'partner_metrics/catalogs/warehouses/2025-09-03/9efa31ef_05:24:02.parquet.gz' # Change this to the actual file key you want to delete
-    delete_s3_file(your_bucket, file_to_delete_key)
-    print("Operations complete. Uncomment function calls to perform actions.")
+    # # Example: Delete a file (BE VERY CAREFUL WITH THIS)
+    # # Make sure this is the correct file you want to delete.
+    # file_to_delete_key = 'partner_metrics/catalogs/warehouses/2025-09-03/9efa31ef_05:24:02.parquet.gz' # Change this to the actual file key you want to delete
+    # delete_s3_file(your_bucket, file_to_delete_key)
+    # print("Operations complete. Uncomment function calls to perform actions.")
