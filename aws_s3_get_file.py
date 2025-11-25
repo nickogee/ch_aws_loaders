@@ -42,8 +42,8 @@ def delete_s3_file(bucket_obj, key: str):
 
 if __name__ == "__main__":
     # # Example: Download a file
-    file_to_download_key = 'partner_metrics/backend_events/cancelled_orders/2025-11-15/68b608ac_08:55:15.parquet.gz'
-    local_download_path = 'temp/cancelled_orders_2025-11-15.parquet.gz' # Downloads to the script's directory
+    file_to_download_key = 'financial_metrics/transactions/2025-11-14/f7b16df8bf69ecb8_02:00:00.parquet.gz'
+    local_download_path = 'temp/transactions_2025-11-14.parquet.gz' # Downloads to the script's directory
     download_s3_file(your_bucket, file_to_download_key, local_download_path)
 
     # # Example: Delete a file (BE VERY CAREFUL WITH THIS)

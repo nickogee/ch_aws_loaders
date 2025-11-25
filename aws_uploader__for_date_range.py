@@ -7,31 +7,54 @@ import time
 
 pa_schema = None
 pa_schema = pa.schema([
-    pa.field("name", pa.string()),
-    pa.field("user_id", pa.string()),
-    pa.field("city_name", pa.string()),
-    pa.field("county_code", pa.string()),
-    pa.field("event_id", pa.string()),
-    pa.field("currency", pa.string()),
-    pa.field("actual_delivery_time", pa.timestamp('us', tz='UTC')),
-    pa.field("order_creation_time", pa.timestamp('us', tz='UTC')),
-    pa.field("min_promised_delivery_time", pa.int64()),
-    pa.field("max_promised_delivery_time", pa.int64()),
-    pa.field(
-        "delivered_products",
-            pa.struct([
-                pa.field("name", pa.string()),
-                pa.field("id", pa.int64()),
-                pa.field("price", pa.int64()),
-                pa.field("original_price", pa.int64()),
-                pa.field("quantity", pa.int64())
-            ])
-        ),
-    pa.field("order_id", pa.string()),
-    pa.field("payment_id", pa.string()),
-    pa.field("promocode_name", pa.string()),
-    pa.field("promocode_conditions", pa.string()),
-])
+    pa.field("adid", pa.float64()),
+    pa.field("amplitude_attribution_ids", pa.list_(pa.string())),
+    pa.field("amplitude_event_type", pa.float64()),
+    pa.field("amplitude_id", pa.int64()),
+    pa.field("app", pa.int64()),
+    pa.field("city", pa.string()),
+    pa.field("client_event_time", pa.timestamp('us', tz='UTC')),
+    pa.field("client_upload_time", pa.timestamp('us', tz='UTC')),
+    pa.field("country", pa.string()),
+    pa.field("data", pa.string()),
+    pa.field("device_brand", pa.float64()),
+    pa.field("device_carrier", pa.float64()),
+    pa.field("device_family", pa.string()),
+    pa.field("device_id", pa.string()),
+    pa.field("device_manufacturer", pa.float64()),
+    pa.field("device_model", pa.float64()),
+    pa.field("device_type", pa.string()),
+    pa.field("event_id", pa.int64()),
+    pa.field("event_properties", pa.string()),
+    pa.field("event_time", pa.timestamp('us', tz='UTC')),
+    pa.field("event_type", pa.string()),
+    pa.field("followed_an_identify", pa.float64()),
+    pa.field("group_properties", pa.string()),
+    pa.field("groups", pa.string()),
+    pa.field("idfa", pa.float64()),
+    pa.field("ip_address", pa.string()),
+    pa.field("is_attribution_event", pa.float64()),
+    pa.field("language", pa.string()),
+    pa.field("library", pa.string()),
+    pa.field("location_lat", pa.float64()),
+    pa.field("location_lng", pa.float64()),
+    pa.field("os_name", pa.string()),
+    pa.field("os_version", pa.string()),
+    pa.field("paying", pa.float64()),
+    pa.field("platform", pa.string()),
+    pa.field("processed_time", pa.timestamp('us', tz='UTC')),
+    pa.field("region", pa.string()),
+    pa.field("sample_rate", pa.float64()),
+    pa.field("server_received_time", pa.timestamp('us', tz='UTC')),
+    pa.field("server_upload_time", pa.timestamp('us', tz='UTC')),
+    pa.field("session_id", pa.int64()),
+    pa.field("start_version", pa.float64()),
+    pa.field("user_creation_time", pa.timestamp('us')),
+    pa.field("user_id", pa.float64()),
+    pa.field("user_properties", pa.string()),
+    pa.field("uuid", pa.string()),
+    pa.field("version_name", pa.float64()),
+        ])
 
 
 
@@ -42,8 +65,8 @@ def process_single_date(raw_dt, bq_table_addres, s3_entity_path, pa_schema):
         exporter.raw_dt = raw_dt
         exporter.dt = datetime.strptime(str(exporter.raw_dt), '%Y%m%d').strftime('%Y-%m-%d')    
         
-        where_condition = f"timestamp_trunc(order_creation_time, day) = '{exporter.dt}'"
-
+        where_condition = f"(lower(json_extract_scalar(event_properties,'$.user_agent')) like '%indrive%' or json_extract_scalar(event_properties, '$.currentApp' ) ='miniApp_inDrive') AND timestamp_trunc(event_time, day) = '{exporter.dt}'"
+    
         # Build query using schema
         query = exporter.build_query(bq_table_addres=bq_table_addres, where_condition=where_condition)
         print(f"Processing date {raw_dt} - Generated query:\n{query}")
@@ -83,12 +106,12 @@ def generate_date_range(start_date_str, end_date_str):
 
 if __name__ == '__main__':
     # Define date range - modify these dates as needed
-    start_date = '20251115'  # Start date in YYYYMMDD format
-    end_date = '20251117'    # End date in YYYYMMDD format
+    start_date = '20251124'  # Start date in YYYYMMDD format
+    end_date = '20251124'    # End date in YYYYMMDD format
     
-    bq_table_addres = 'organic-reef-315010.indrive.indrive__backend_events_order_delivered'
-    s3_entity_path = 'partner_metrics/backend_events/delivered_orders'
-                                                    
+    bq_table_addres = 'organic-reef-315010.indrive.amplitude_event_wo_dma'
+    s3_entity_path = 'partner_metrics/amplitude'
+                                                        
     # Generate schema once
     if not pa_schema:  
         pa_schema = get_pyarrow_schema_from_bq(table_id=bq_table_addres)  
