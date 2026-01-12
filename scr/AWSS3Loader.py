@@ -46,7 +46,14 @@ class S3UploadError(S3UploaderError):
 class S3Uploader():
     """Handles the process of converting, compressing, and uploading files to S3."""
 
-    def __init__(self, entity_path: str, dt_partition: datetime, gzip_path: str, dt_now: Optional[datetime] = None):
+    def __init__(
+        self,
+        entity_path: str,
+        dt_partition: datetime,
+        gzip_path: str,
+        dt_now: Optional[datetime] = None,
+        clear_path_before_upload: bool = True,
+    ):
 
         """
         Initialize the S3Uploader.
@@ -63,6 +70,7 @@ class S3Uploader():
         self.dt_partition = dt_partition
         self.hash_string = self._generate_hash(8)
         self.gzip_path =  Path(f"{gzip_path}")
+        self.clear_path_before_upload = clear_path_before_upload
         self._setup_paths()
         self._setup_s3_client()
 
@@ -193,10 +201,11 @@ class S3Uploader():
 
         self.logger.info(f"Uploading {self.gzip_path} to S3")
         try:
-            # Clear the S3 path before uploading
-            s3_path_to_clear = self.s3_parent_path_file_key
-            self.logger.info(f"Clearing S3 path before upload: {s3_path_to_clear}")
-            self._clear_s3_path(s3_path_to_clear)
+            # Clear the S3 path before uploading if requested
+            if self.clear_path_before_upload:
+                s3_path_to_clear = self.s3_parent_path_file_key
+                self.logger.info(f"Clearing S3 path before upload: {s3_path_to_clear}")
+                self._clear_s3_path(s3_path_to_clear)
 
             self.bucket.upload_file(
                 Key=self.s3_full_file_key,

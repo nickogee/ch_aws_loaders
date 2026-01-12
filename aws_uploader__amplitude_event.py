@@ -1,10 +1,9 @@
 from scr.AWSS3Loader import S3Uploader
 from scr.BigqueryToJson import BigQueryExporter
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import pyarrow as pa
 from scr.BigqueryShcemaToPyarrow import get_pyarrow_schema_from_bq
-import time
-
+ 
 pa_schema = None
 pa_schema = pa.schema([
     pa.field("adid", pa.float64()),
@@ -57,83 +56,54 @@ pa_schema = pa.schema([
         ])
 
 
+if __name__ == '__main__':
 
-
-def process_single_date(raw_dt, bq_table_addres, s3_entity_path, pa_schema):
-    """Process data for a single date"""
     with BigQueryExporter() as exporter:
-        exporter.raw_dt = raw_dt
-        exporter.dt = datetime.strptime(str(exporter.raw_dt), '%Y%m%d').strftime('%Y-%m-%d')    
         
+        exporter.raw_dt = '20251120'
+        exporter.dt = datetime.strptime(str(exporter.raw_dt), '%Y%m%d').strftime('%Y-%m-%d')
+        
+        bq_table_addres = 'organic-reef-315010.indrive.amplitude_event_wo_dma'
+        s3_entity_path = 'partner_metrics/amplitude'
         where_condition = f"(lower(json_extract_scalar(event_properties,'$.user_agent')) like '%indrive%' or json_extract_scalar(event_properties, '$.currentApp' ) ='miniApp_inDrive') AND timestamp_trunc(event_time, day) = '{exporter.dt}'"
-    
+        
         # Build query using schema
         query = exporter.build_query(bq_table_addres=bq_table_addres, where_condition=where_condition)
-        print(f"Processing date {raw_dt} - Generated query:\n{query}")
+        print(f"Generated query:\n{query}")
         
-        parquet_gz_path = exporter.export_to_parquet_gzip(query, schema=pa_schema, bq_table_addres=bq_table_addres)
+        if not pa_schema:  
+            pa_schema = get_pyarrow_schema_from_bq(table_id=bq_table_addres)  
+            
+        print('===== Used schema:', pa_schema, sep='\n')
+
+        parquet_gz_paths = exporter.export_to_parquet_gzip(
+            query,
+            schema=pa_schema,
+            bq_table_addres=bq_table_addres,
+            max_parquet_size_bytes=5 * 1024 * 1024,  # 5 MB limit before gzip
+        )
         ##############################
 
-        if parquet_gz_path:
+        if parquet_gz_paths:
+            if isinstance(parquet_gz_paths, str):
+                parquet_gz_paths = [parquet_gz_paths]
+
             dt_partition_utc = datetime.strptime(str(exporter.raw_dt), '%Y%m%d')
             dt_now_utc = datetime.now(timezone.utc)
-            upl_to_aws = S3Uploader(entity_path=s3_entity_path, 
-                                    dt_now=dt_now_utc, 
-                                    dt_partition=dt_partition_utc,
-                                    gzip_path=parquet_gz_path)
-            
-            rez = upl_to_aws.run()
-            print(f'Date {raw_dt}: Successfully uploaded!' if rez else f'Date {raw_dt}: Upload failed!')
-            return rez
-        else:
-            print(f'Date {raw_dt}: No data exported')
-            return False
 
+            overall_success = True
+            for idx, gz_path in enumerate(parquet_gz_paths):
+                clear_path = idx == 0  # clear path only before first upload
+                upl_to_aws = S3Uploader(
+                    entity_path=s3_entity_path,
+                    dt_now=dt_now_utc,
+                    dt_partition=dt_partition_utc,
+                    gzip_path=gz_path,
+                    clear_path_before_upload=clear_path,
+                )
 
-def generate_date_range(start_date_str, end_date_str):
-    """Generate list of dates between start_date and end_date (inclusive)"""
-    start_date = datetime.strptime(start_date_str, '%Y%m%d')
-    end_date = datetime.strptime(end_date_str, '%Y%m%d')
-    
-    dates = []
-    current_date = start_date
-    while current_date <= end_date:
-        dates.append(current_date.strftime('%Y%m%d'))
-        current_date += timedelta(days=1)
-    
-    return dates
+                rez = upl_to_aws.run()
+                print(f'File {idx + 1}/{len(parquet_gz_paths)} upload {"succeeded" if rez else "failed"}')
+                overall_success = overall_success and rez
 
-
-if __name__ == '__main__':
-    # Define date range - modify these dates as needed
-    start_date = '20251209'  # Start date in YYYYMMDD format
-    end_date = '20251209'    # End date in YYYYMMDD format
-    
-    bq_table_addres = 'organic-reef-315010.indrive.amplitude_event_wo_dma'
-    s3_entity_path = 'partner_metrics/amplitude'
-                                                        
-    # Generate schema once
-    if not pa_schema:  
-        pa_schema = get_pyarrow_schema_from_bq(table_id=bq_table_addres)  
-        print('===== Generated schema:', pa_schema, sep='\n')
-    
-    # Generate date range
-    date_list = generate_date_range(start_date, end_date)
-    print(f"Processing dates from {start_date} to {end_date}")
-    print(f"Total dates to process: {len(date_list)}")
-    
-    # Process each date
-    success_count = 0
-    for raw_dt in date_list:
-        print(f"\n--- Processing date: {raw_dt} ---")
-        try:
-            success = process_single_date(raw_dt, bq_table_addres, s3_entity_path, pa_schema)
-            
-            time.sleep(2)
-            if success:
-                success_count += 1
-        except Exception as e:
-            print(f"Error processing date {raw_dt}: {e}")
-    
-    print(f"\n=== Summary ===")
-    print(f"Successfully processed: {success_count}/{len(date_list)} dates")
+            print('All uploads completed successfully!' if overall_success else 'Some uploads failed!')
