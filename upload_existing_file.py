@@ -7,10 +7,10 @@ from pathlib import Path
 if __name__ == '__main__':
 
   
-    raw_dt = '20250907'
-    s3_entity_path = 'partner_metrics/amplitude'
+    raw_dt = '20260317'
+    s3_entity_path = 'partner_metrics/financial_aggrigate'
     
-    gzip_path_str = 'temp/bigquery_export_7hfsvu5t/export_organic-reef-315010.indrive.amplitude_event_wo_dma_20250912_154928.parquet.gz'
+    gzip_path_str = 'temp/financial_aggrigate_2026-03-17.parquet.gz'
     gzip_path = Path(gzip_path_str)
     ##############################
 

@@ -1,14 +1,14 @@
 import pyarrow.parquet as pq
 
-amplitude_08 = pq.read_table('temp/cancelled_orders_2025-11-15.parquet')
-amplitude_04 = pq.read_table('temp/bigquery_export_1fu21_a5/export_organic-reef-315010.indrive.indrive__backend_events_cancelled_orders_20251118_094243.parquet')
+amplitude_08 = pq.read_table('temp/financial_aggrigate_2026-03-17.parquet')
+# amplitude_04 = pq.read_table('temp/bigquery_export_1fu21_a5/export_organic-reef-315010.indrive.indrive__backend_events_cancelled_orders_20251118_094243.parquet')
 
 # Print differences between the two schemas
 schema_08 = amplitude_08.schema
-schema_04 = amplitude_04.schema
+# schema_04 = amplitude_04.schema
 
 fields_08 = {f.name: f for f in schema_08}
-fields_04 = {f.name: f for f in schema_04}
+# fields_04 = {f.name: f for f in schema_04}
 
 # with open('temp/delivered_orders.txt', 'w', encoding='utf-8') as f:
 #     for name, field in fields_08.items():
