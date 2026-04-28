@@ -15,6 +15,8 @@ pa_schema = pa.schema([
     pa.field("orders", pa.int64()),
     pa.field("aov", pa.float64()),
     pa.field("gmv", pa.float64()),
+    pa.field("gmv_disc", pa.float64()),
+    pa.field("incentives", pa.float64()),
     pa.field("delivery_fee_revenue", pa.float64()),
     pa.field("service_fee_revenue", pa.float64()),
     pa.field("gtv", pa.float64()),
@@ -31,6 +33,8 @@ SELECT
   COUNT(DISTINCT mart_orders.order_id) AS orders,
   ROUND(AVG(mart_orders.original_price), 2) AS aov,
   SUM(mart_orders.original_price) AS gmv,
+  SUM(mart_orders.oi_price) AS gmv_disc,
+  SUM(mart_orders.original_price - mart_orders.oi_price) AS incentives,
   SUM(mart_orders.delivery_fee_price) AS delivery_fee_revenue,
   SUM(mart_orders.service_fee_price) AS service_fee_revenue,
 FROM
@@ -38,13 +42,14 @@ FROM
 
 WHERE TIMESTAMP_TRUNC(mart_orders.created_at, day) = TIMESTAMP('@dt@')
   AND mart_orders.status <> 8
+  AND (mart_orders.refund_amount <> mart_orders.oi_price + mart_orders.delivery_fee_price + mart_orders.service_fee_price) -- refunds <> gtv
 
   group by mart_orders.platform
 )
 
 SELECT
   *,
-  gmv + delivery_fee_revenue + service_fee_revenue as gtv,
+  gmv_disc + delivery_fee_revenue + service_fee_revenue as gtv,
   from ord
 """
 
@@ -104,8 +109,8 @@ if __name__ == '__main__':
     #     end_date = exporter.raw_dt
 
     # Get current date in YYYYMMDD format if not set elsewhere
-    start_date = '20250101'    # Start date in YYYYMMDD format
-    end_date = '20260402'    # End date in YYYYMMDD format
+    start_date = '20260410'    # Start date in YYYYMMDD format
+    end_date = '20260423'    # End date in YYYYMMDD format 
     
     if end_date is None:
         end_date = datetime.now().strftime('%Y%m%d')    # End date in YYYYMMDD format
@@ -132,6 +137,7 @@ if __name__ == '__main__':
     
     # Process each date
     success_count = 0
+    unsuccess_date_dt = {}
     for raw_dt in date_list:
         print(f"\n--- Processing date: {raw_dt} ---")
         try:
@@ -141,7 +147,12 @@ if __name__ == '__main__':
             if success:
                 success_count += 1
         except Exception as e:
+            unsuccess_date_dt[str(raw_dt)] = str(e)
             print(f"Error processing date {raw_dt}: {e}")
     
     print(f"\n=== Summary ===")
     print(f"Successfully processed: {success_count}/{len(date_list)} dates")
+    if unsuccess_date_dt:
+        print(f"Unsuccessfully processed: {unsuccess_date_dt}")
+        raise RuntimeError(f"Some dates failed to process: {unsuccess_date_dt.keys()}")
+   

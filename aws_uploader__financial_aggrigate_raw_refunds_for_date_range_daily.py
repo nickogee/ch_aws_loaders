@@ -8,44 +8,33 @@ import copy
 
 pa_schema = None
 pa_schema = pa.schema([
-    pa.field("platform", pa.string()),
-    pa.field("month", pa.string()),
-    pa.field("active_darkstores", pa.int64()),
-    pa.field("unique_users", pa.int64()),
-    pa.field("orders", pa.int64()),
-    pa.field("aov", pa.float64()),
-    pa.field("gmv", pa.float64()),
-    pa.field("delivery_fee_revenue", pa.float64()),
-    pa.field("service_fee_revenue", pa.float64()),
-    pa.field("gtv", pa.float64()),
+    pa.field("created_at", pa.string()),
+    pa.field("refund_id", pa.int64()),
+    pa.field("idempotency_key", pa.string()),
+    pa.field("order_id", pa.int64()),
+    pa.field("price", pa.float64()),
+    pa.field("reference", pa.int64()),
+    pa.field("refunded_at", pa.string()),
+    pa.field("response_data", pa.string()),
+    pa.field("type", pa.int64()),   
+    pa.field("uuid", pa.string()),
         ])
 
 query = """ 
-with ord as (
-
-SELECT
-  mart_orders.platform AS platform,
-  FORMAT_TIMESTAMP('%Y.%m.01', max( mart_orders.created_at)) AS month,
-  COUNT(DISTINCT mart_orders.warehouse_id) AS active_darkstores,
-  COUNT(DISTINCT mart_orders.user_id) AS unique_users,
-  COUNT(DISTINCT mart_orders.order_id) AS orders,
-  ROUND(AVG(mart_orders.original_price), 2) AS aov,
-  SUM(mart_orders.original_price) AS gmv,
-  SUM(mart_orders.delivery_fee_price) AS delivery_fee_revenue,
-  SUM(mart_orders.service_fee_price) AS service_fee_revenue,
+SELECT 
+    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', refunds.created_at) as created_at,
+    id as refund_id,
+    idempotency_key,
+    order_id,
+    price,
+    reference,
+    FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', refunds.refunded_at) as refunded_at,
+    response_data,
+    type,
+    uuid
 FROM
-  `@bq_table_addres@` AS mart_orders
-
-WHERE TIMESTAMP_TRUNC(mart_orders.created_at, month) = TIMESTAMP('@dt@')
-  AND mart_orders.status <> 8
-
-  group by mart_orders.platform
-)
-
-SELECT
-  *,
-  gmv + delivery_fee_revenue + service_fee_revenue as gtv,
-  from ord
+  `@bq_table_addres@` AS refunds
+WHERE TIMESTAMP_TRUNC(created_at, DAY) = TIMESTAMP('@dt@')
 """
 
 
@@ -82,24 +71,17 @@ def process_single_date(raw_dt, bq_table_addres, s3_entity_path, pa_schema):
             return False
 
 
-def generate_month_range(start_date_str, end_date_str):
-    """Generate list of month-start dates (YYYYMM01) between start_date and end_date (inclusive)."""
-    # Use only year+month from the provided YYYYMMDD strings and normalize to first day of month
-    start_month = datetime.strptime(start_date_str[:6] + '01', '%Y%m%d')
-    end_month = datetime.strptime(end_date_str[:6] + '01', '%Y%m%d')
-
+def generate_date_range(start_date_str, end_date_str):
+    """Generate list of dates between start_date and end_date (inclusive)"""
+    start_date = datetime.strptime(start_date_str, '%Y%m%d')
+    end_date = datetime.strptime(end_date_str, '%Y%m%d')
+    
     dates = []
-    current = start_month
-    while current <= end_month:
-        # Store as first day of month in YYYYMMDD format (e.g. 20250101)
-        dates.append(current.strftime('%Y%m01'))
-
-        # Move to first day of next month
-        if current.month == 12:
-            current = datetime(current.year + 1, 1, 1)
-        else:
-            current = datetime(current.year, current.month + 1, 1)
-
+    current_date = start_date
+    while current_date <= end_date:
+        dates.append(current_date.strftime('%Y%m%d'))
+        current_date += timedelta(days=1)
+    
     return dates
 
 
@@ -111,8 +93,8 @@ if __name__ == '__main__':
     #     end_date = exporter.raw_dt
 
     # Get current date in YYYYMMDD format if not set elsewhere
-    start_date = '20260301'    # Start date in YYYYMMDD format
-    end_date = '20260301'    # End date in YYYYMMDD format
+    start_date = '20250106'    # Start date in YYYYMMDD format
+    end_date = '20260420'    # End date in YYYYMMDD format
     
     if end_date is None:
         end_date = datetime.now().strftime('%Y%m%d')    # End date in YYYYMMDD format
@@ -124,20 +106,20 @@ if __name__ == '__main__':
         start_date_dt = end_date_dt - timedelta(days=2)
         start_date = start_date_dt.strftime('%Y%m%d')  # Start date in YYYYMMDD format
     
-    bq_table_addres = 'organic-reef-315010.mart.mart_orders'
-    s3_entity_path = 'partner_metrics/financial_aggregate/monthly'
+    bq_table_addres = 'organic-reef-315010.staging.stg_lavka__refunds'
+    s3_entity_path = 'partner_metrics/financial_aggregate/raw_refunds'
                                                         
     # Generate schema once
     if not pa_schema:  
         pa_schema = get_pyarrow_schema_from_bq(table_id=bq_table_addres)  
         print('===== Generated schema:', pa_schema, sep='\n')
     
-    # Generate month range
-    date_list = generate_month_range(start_date, end_date)
-    print(f"Processing months from {start_date} to {end_date}")
-    print(f"Total months to process: {len(date_list)}")
+    # Generate date range
+    date_list = generate_date_range(start_date, end_date)
+    print(f"Processing dates from {start_date} to {end_date}")
+    print(f"Total dates to process: {len(date_list)}")
     
-    # Process each month
+    # Process each date
     success_count = 0
     unsuccess_date_dt = {}
     for raw_dt in date_list:
@@ -158,3 +140,4 @@ if __name__ == '__main__':
         print(f"Unsuccessfully processed: {unsuccess_date_dt}")
         raise RuntimeError(f"Some dates failed to process: {unsuccess_date_dt.keys()}")
    
+        

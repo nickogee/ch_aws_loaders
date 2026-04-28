@@ -57,12 +57,12 @@ def process_single_date(date_str, s3_entity_path, bq_schema_path, table_name):
 if __name__ == '__main__':
     with BigQueryImporter() as s3_importer:
         # Define date range - modify these dates as needed
-        start_date = '2026-03-01'  # Start date in YYYY-MM-DD format
-        end_date = '2026-03-15'     # End date in YYYY-MM-DD format
+        start_date = '2026-01-01'  # Start date in YYYY-MM-DD format
+        end_date = '2026-01-03'     # End date in YYYY-MM-DD format
         
-        s3_entity_path = 'partner_metrics/financial_aggregate/daily/'
+        s3_entity_path = 'partner_metrics/financial_aggregate/raw_daily/'
         bq_schema_path = 'organic-reef-315010.indrive_dev'
-        table_name = 'test_financial_aggrigate'
+        table_name = 'test_financial_aggregate_raw_daily'
         
         # Generate date range
         date_list = generate_date_range(start_date, end_date)

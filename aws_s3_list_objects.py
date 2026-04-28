@@ -18,7 +18,7 @@ your_bucket = s3.Bucket(bucket_name)
 
 # Define the specific path you want to list objects from
 # target_path = "partner_metrics/backend_events/delivered_orders/2025-11-1"
-target_path = "partner_metrics/financial_aggregate/monthly/"
+target_path = "partner_metrics/financial_aggregate/raw_daily/2026-03-28"
 
 print(f"Listing objects in path: {target_path}")
 print("-" * 50)

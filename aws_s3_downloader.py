@@ -10,13 +10,13 @@ if __name__ == '__main__':
     with BigQueryImporter() as s3_importer:
         
         # start_date = s3_importer.dt
-        start_date = '2026-03-01'
-        s3_entity_path = 'partner_metrics/financial_aggregate/monthly/'
+        start_date = '2026-04-15'
+        s3_entity_path = 'partner_metrics/financial_aggregate/daily/'
         bq_schema_path = 'organic-reef-315010.indrive_dev'
         
         s3_prefix = f'{s3_entity_path}{start_date}/' 
         # table_name = s3_entity_path.replace('/', '-')[:len(s3_entity_path)-1] # S3 folder to scan for *.log.gz or *.parquet.gz
-        table_name = 'test_financial_aggregate_monthly'
+        table_name = 'test_financial_aggregate_daily'
 
         
         bq_table = f'{bq_schema_path}.{table_name}'  # BigQuery table to load into
